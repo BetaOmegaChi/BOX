@@ -1,13 +1,12 @@
 // src/NavBar.jsx
 //
 // Persistent top navigation bar.  Renders the brand, main nav links, external
-// social links, and a Login/Logout button that reflects the current Firebase
+// social links, and a Login/Logout button that reflects the current Supabase
 // auth state in real time.
 
 import React, { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { signOut, onAuthStateChanged } from 'firebase/auth';
-import { auth } from './firebase';
+import { supabase } from './supabase';
 import log from './logger';
 import './NavBar.css';
 
@@ -49,36 +48,38 @@ function StoreIcon(props) {
 export default function NavBar() {
   const navigate = useNavigate();
   const [open, setOpen]         = useState(false);
-  const [loggedIn, setLoggedIn] = useState(!!auth.currentUser);
+  const [loggedIn, setLoggedIn] = useState(false);
 
-  // Keep the login/logout button in sync with Firebase auth state.
+  // Sync with Supabase auth state — fires immediately with current session,
+  // then updates whenever the user signs in or out.
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
-      log.auth('NavBar: auth state →', user ? 'logged in' : 'logged out');
-      setLoggedIn(!!user);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setLoggedIn(!!session?.user);
     });
-    return () => unsub();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      log.auth('NavBar: auth state →', session?.user ? 'logged in' : 'logged out');
+      setLoggedIn(!!session?.user);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const handleLogout = async (e) => {
-    // Stop the click from bubbling to the parent <nav> before the async work
-    // finishes, which could cause a race condition on mobile.
     e.preventDefault();
     e.stopPropagation();
     log.auth('NavBar: logout initiated');
     try {
-      await signOut(auth);
+      await supabase.auth.signOut();
       log.auth('NavBar: logout successful');
     } catch (err) {
       log.error('NavBar: logout failed', err);
     }
-    localStorage.removeItem('loggedIn');
     setLoggedIn(false);
     setOpen(false);
     navigate('/login');
   };
 
-  // Returns the appropriate className for NavLink based on active state.
   const linkClass = ({ isActive }) => (isActive ? 'nav-link active' : 'nav-link');
 
   return (

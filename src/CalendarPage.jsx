@@ -1,6 +1,6 @@
 // src/CalendarPage.jsx
 //
-// Monthly calendar grid.  Fetches events for the visible month from Firestore
+// Monthly calendar grid.  Fetches events for the visible month from Supabase
 // in real time and renders each day as a clickable button.  Supports:
 //   • Previous/Next/Today controls
 //   • Keyboard navigation  (← → PageUp PageDown = months, T = today)
@@ -11,15 +11,14 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import './style.css';
 import './CalendarPage.css';
 
-import { db } from './firebase';
-import { collection, onSnapshot, query, where, orderBy } from 'firebase/firestore';
+import { supabase, mapEvent } from './supabase';
 import log from './logger';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Converts a Date to a "YYYY-MM-DD" Firestore dateKey. */
+/** Converts a Date to a "YYYY-MM-DD" dateKey. */
 function toKey(d) {
   const y  = d.getFullYear();
   const m  = String(d.getMonth() + 1).padStart(2, '0');
@@ -52,9 +51,9 @@ function formatTime12h(t) {
 // ---------------------------------------------------------------------------
 // Swipe gesture thresholds — tune here if swipe feels too sensitive/loose
 // ---------------------------------------------------------------------------
-const SWIPE_MIN_PX   = 48;   // minimum horizontal distance (px)
-const SWIPE_MAX_DEG  = 30;   // maximum angle from horizontal (degrees)
-const SWIPE_MAX_MS   = 800;  // maximum gesture duration (ms)
+const SWIPE_MIN_PX   = 48;
+const SWIPE_MAX_DEG  = 30;
+const SWIPE_MAX_MS   = 800;
 
 // ---------------------------------------------------------------------------
 // Component
@@ -68,7 +67,7 @@ export default function CalendarPage() {
   const todayKey = toKey(today);
 
   const [viewYear,     setViewYear]     = useState(today.getFullYear());
-  const [viewMonth,    setViewMonth]    = useState(today.getMonth()); // 0–11
+  const [viewMonth,    setViewMonth]    = useState(today.getMonth());
   const [eventsByDate, setEventsByDate] = useState({});
 
   // If navigating back from ViewDatePage, restore the month that was open.
@@ -82,46 +81,60 @@ export default function CalendarPage() {
       setViewYear(location.state.year);
       setViewMonth(location.state.month);
     }
-    // Only run on mount; location.state is only meaningful on initial load here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ---------------------------------------------------------------------------
-  // Live Firestore subscription for the visible month
+  // Live Supabase subscription for the visible month
   // ---------------------------------------------------------------------------
   useEffect(() => {
+    let mounted = true;
     const { start, end } = monthKeyRange(viewYear, viewMonth);
-    log.firebase(`CalendarPage: subscribing to events ${start} → ${end}`);
 
-    const qRef = query(
-      collection(db, 'events'),
-      where('dateKey', '>=', start),
-      where('dateKey', '<=', end),
-      orderBy('dateKey', 'asc')
-    );
+    async function fetchEvents() {
+      log.firebase(`CalendarPage: fetching events ${start} → ${end}`);
 
-    const unsub = onSnapshot(
-      qRef,
-      (snap) => {
-        log.firebase(`CalendarPage: snapshot — ${snap.size} event(s) for month`);
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .gte('date_key', start)
+        .lte('date_key', end)
+        .order('date_key', { ascending: true });
 
-        // Group events by dateKey so each calendar cell can look up its list in O(1).
-        const map = {};
-        snap.forEach((docSnap) => {
-          const ev = { id: docSnap.id, ...docSnap.data() };
-          if (!map[ev.dateKey]) map[ev.dateKey] = [];
-          map[ev.dateKey].push(ev);
-        });
-        setEventsByDate(map);
-      },
-      (err) => {
-        log.error('CalendarPage: Firestore snapshot error', err);
+      if (!mounted) return;
+
+      if (error) {
+        log.error('CalendarPage: fetch error', error);
+        return;
       }
-    );
+
+      log.firebase(`CalendarPage: received ${data.length} event(s) for month`);
+
+      // Group events by dateKey so each calendar cell can look up its list in O(1).
+      const map = {};
+      (data ?? []).forEach(row => {
+        const ev = mapEvent(row);
+        if (!map[ev.dateKey]) map[ev.dateKey] = [];
+        map[ev.dateKey].push(ev);
+      });
+      setEventsByDate(map);
+    }
+
+    fetchEvents();
+
+    // Re-fetch whenever any event row changes.
+    const channel = supabase
+      .channel(`calendar-${viewYear}-${viewMonth}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => {
+        log.firebase('CalendarPage: change detected, re-fetching');
+        fetchEvents();
+      })
+      .subscribe();
 
     return () => {
+      mounted = false;
       log.firebase('CalendarPage: unsubscribing');
-      unsub();
+      supabase.removeChannel(channel);
     };
   }, [viewYear, viewMonth]);
 
@@ -145,7 +158,6 @@ export default function CalendarPage() {
     setViewMonth(t.getMonth());
   };
 
-  // Keyboard shortcuts — only fires when the user isn't typing in a field.
   useEffect(() => {
     const onKey = (e) => {
       const target  = e.target;
@@ -162,11 +174,6 @@ export default function CalendarPage() {
 
   // ---------------------------------------------------------------------------
   // Swipe gesture (Pointer Events API)
-  //
-  // Strategy: record the pointer-down position and time, then on pointer-up
-  // decide whether the motion qualifies as a horizontal swipe.  If it does we
-  // flip the month AND set a short-lived flag so the subsequent "click" event
-  // fired by the browser doesn't accidentally open a day.
   // ---------------------------------------------------------------------------
 
   const pointerStart = useRef({ x: 0, y: 0 });
@@ -174,7 +181,6 @@ export default function CalendarPage() {
   const didSwipe     = useRef(false);
   const pointerTime  = useRef(0);
 
-  // Set the flag and clear it after the synthetic click fires (next tick).
   const markSwipeAndClear = () => {
     didSwipe.current = true;
     setTimeout(() => { didSwipe.current = false; }, 0);
@@ -188,9 +194,7 @@ export default function CalendarPage() {
     e.currentTarget.setPointerCapture?.(e.pointerId);
   };
 
-  const onPointerMove = (/* e */) => {
-    // Decision is deferred to pointer-up so we don't need to do anything here.
-  };
+  const onPointerMove = (/* e */) => {};
 
   const onPointerUp = (e) => {
     if (!isDragging.current) return;
@@ -212,7 +216,7 @@ export default function CalendarPage() {
   };
 
   const openDate = (day) => {
-    if (didSwipe.current) return; // swipe ended on this cell — ignore the synthetic click
+    if (didSwipe.current) return;
     const dateKey = toKey(new Date(viewYear, viewMonth, day));
     log.info('CalendarPage: opening date', dateKey);
     navigate(`/view-date/${dateKey}`);
@@ -224,7 +228,7 @@ export default function CalendarPage() {
 
   const weekDays    = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const firstOfMonth = useMemo(() => new Date(viewYear, viewMonth, 1), [viewYear, viewMonth]);
-  const firstDay     = firstOfMonth.getDay(); // 0 (Sun) – 6 (Sat)
+  const firstDay     = firstOfMonth.getDay();
   const daysInMonth  = new Date(viewYear, viewMonth + 1, 0).getDate();
 
   const monthName = useMemo(() =>
@@ -232,26 +236,21 @@ export default function CalendarPage() {
     [viewYear, viewMonth]
   );
 
-  // Build the flat array of cells: header row + leading blanks + day buttons.
   const cells = [];
 
-  // Day-of-week header row
   for (const day of weekDays) {
     cells.push(<div key={'h' + day} className="calendar-cell header">{day}</div>);
   }
 
-  // Blank cells before the 1st of the month
   for (let i = 0; i < firstDay; i++) {
     cells.push(<div key={'e' + i} className="calendar-cell" />);
   }
 
-  // One button per day
   for (let day = 1; day <= daysInMonth; day++) {
     const date    = new Date(viewYear, viewMonth, day);
     const dateKey = toKey(date);
     const isToday = dateKey === todayKey;
 
-    // Sort the day's events: all-day first, then by start time.
     const events = [...(eventsByDate[dateKey] || [])].sort((a, b) => {
       const aIsAllDay = a.allDay ? 1 : 0;
       const bIsAllDay = b.allDay ? 1 : 0;
@@ -276,7 +275,6 @@ export default function CalendarPage() {
 
         {events.length > 0 && (
           <div className="event-list">
-            {/* Show at most 2 event titles to keep cells compact */}
             {events.slice(0, 2).map((ev) => {
               const title = ev.title ?? ev.text ?? '';
               const when  = ev.allDay

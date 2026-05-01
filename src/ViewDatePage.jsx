@@ -4,18 +4,14 @@
 //
 // All users can view events.  Authenticated members can create, edit, and
 // delete events.  Writes use an optimistic-update pattern: the UI is updated
-// immediately and rolled back if Firestore rejects the write.
+// immediately and rolled back if Supabase rejects the write.
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import './CalendarPage.css';
 import './ViewDatePage.css';
 
-import { db, auth } from './firebase';
-import {
-  addDoc, collection, deleteDoc, doc,
-  onSnapshot, orderBy, query, updateDoc, where, serverTimestamp,
-} from 'firebase/firestore';
+import { supabase, mapEvent } from './supabase';
 import log from './logger';
 
 // ---------------------------------------------------------------------------
@@ -51,6 +47,16 @@ function formatTime12h(t) {
   return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
 }
 
+/** Sorts events: all-day first, then by start time ascending. */
+function sortEvents(rows) {
+  return [...rows].sort((a, b) => {
+    const aIsAllDay = a.allDay ? 1 : 0;
+    const bIsAllDay = b.allDay ? 1 : 0;
+    if (aIsAllDay !== bIsAllDay) return bIsAllDay - aIsAllDay;
+    return (a.startTime || '99:99').localeCompare(b.startTime || '99:99');
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -60,15 +66,12 @@ export default function ViewDatePage() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Support both /view-date/:dateKey (primary) and ?dateKey= (fallback).
   const dateKey = params?.dateKey ?? new URLSearchParams(location.search).get('dateKey') ?? '';
   const invalid = !isValidDateKey(dateKey);
 
-  // Auth state — read from localStorage for synchronous initial value, then
-  // kept current by watching Firebase auth in the subscription below.
-  const [isLoggedIn, setIsLoggedIn] = useState(
-    typeof window !== 'undefined' && localStorage.getItem('loggedIn') === 'yes'
-  );
+  // Current Supabase user — null when signed out.
+  const [user, setUser] = useState(null);
+  const isLoggedIn = !!user;
 
   // ---------------------------------------------------------------------------
   // Form state — "new event" form
@@ -93,10 +96,24 @@ export default function ViewDatePage() {
   const [err,    setErr]    = useState('');
 
   // ---------------------------------------------------------------------------
-  // Firestore subscription — re-runs whenever the dateKey changes
+  // Auth subscription — keep `user` in sync across the lifetime of this page
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    // Reset all transient state when navigating between days.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Supabase subscription — re-runs whenever the dateKey changes
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
     setEvents([]);
     setEditingId(null);
     setNewTitle(''); setNewDesc(''); setNewAllDay(false);
@@ -105,39 +122,45 @@ export default function ViewDatePage() {
 
     if (invalid) return;
 
-    log.firebase('ViewDatePage: subscribing to events for', dateKey);
+    let mounted = true;
 
-    const qRef = query(
-      collection(db, 'events'),
-      where('dateKey', '==', dateKey),
-      orderBy('createdAt', 'desc')
-    );
+    async function fetchEvents() {
+      log.firebase('ViewDatePage: fetching events for', dateKey);
 
-    const unsub = onSnapshot(
-      qRef,
-      { includeMetadataChanges: true },
-      (snap) => {
-        log.firebase('ViewDatePage: snapshot —', snap.size, 'event(s) for', dateKey,
-          snap.metadata.fromCache ? '(from cache)' : '(from server)');
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('date_key', dateKey)
+        .order('created_at', { ascending: false });
 
-        // Sort: all-day events first, then by start time ascending.
-        const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        rows.sort((a, b) => {
-          const aIsAllDay = a.allDay ? 1 : 0;
-          const bIsAllDay = b.allDay ? 1 : 0;
-          if (aIsAllDay !== bIsAllDay) return bIsAllDay - aIsAllDay;
-          return (a.startTime || '99:99').localeCompare(b.startTime || '99:99');
-        });
-        setEvents(rows);
-      },
-      (err) => {
-        log.error('ViewDatePage: Firestore snapshot error', err);
+      if (!mounted) return;
+
+      if (error) {
+        log.error('ViewDatePage: fetch error', error);
+        return;
       }
-    );
+
+      log.firebase('ViewDatePage:', data.length, 'event(s) for', dateKey);
+      setEvents(sortEvents((data ?? []).map(mapEvent)));
+    }
+
+    fetchEvents();
+
+    const channel = supabase
+      .channel(`viewdate-${dateKey}`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'events', filter: `date_key=eq.${dateKey}` },
+        () => {
+          log.firebase('ViewDatePage: change detected, re-fetching');
+          fetchEvents();
+        }
+      )
+      .subscribe();
 
     return () => {
+      mounted = false;
       log.firebase('ViewDatePage: unsubscribing from', dateKey);
-      unsub();
+      supabase.removeChannel(channel);
     };
   }, [dateKey, invalid]);
 
@@ -173,7 +196,6 @@ export default function ViewDatePage() {
   // ---------------------------------------------------------------------------
 
   function goToDelta(delta) {
-    // Clear volatile state before the URL changes so the next day starts clean.
     setEvents([]); setEditingId(null);
     setNewTitle(''); setNewDesc(''); setErr('');
     navigate(`/view-date/${shiftDateKey(dateKey, delta)}`);
@@ -188,16 +210,13 @@ export default function ViewDatePage() {
   async function addEvent(e) {
     e.preventDefault();
     setErr('');
-    if (!isLoggedIn) return;
+    if (!isLoggedIn || !user) return;
 
     const title       = newTitle.trim();
     const description = newDesc.trim();
     if (!title) return;
 
-    const user = auth.currentUser;
-    if (!user) { setErr('Please sign in.'); return; }
-
-    const allDay  = !!newAllDay;
+    const allDay    = !!newAllDay;
     const startTime = allDay ? '' : normalizeTime(newStartTime);
     const endTime   = allDay ? '' : normalizeTime(newEndTime);
 
@@ -207,26 +226,32 @@ export default function ViewDatePage() {
     }
 
     // Optimistic update: show the event immediately with a temp ID, then
-    // replace it with the real Firestore ID once the write succeeds.
-    const tempId      = `temp-${crypto.randomUUID?.() ?? Math.random()}`;
-    const optimistic  = { id: tempId, dateKey, title, description, allDay, startTime, endTime, ownerId: user.uid, createdAt: new Date() };
+    // replace it with the real Supabase ID once the write succeeds.
+    const tempId     = `temp-${crypto.randomUUID?.() ?? Math.random()}`;
+    const optimistic = { id: tempId, dateKey, title, description, allDay, startTime, endTime, ownerId: user.id, createdAt: new Date().toISOString() };
 
     log.firebase('ViewDatePage: adding event (optimistic)', { title, dateKey });
-    setEvents(prev => [optimistic, ...prev]);
+    setEvents(prev => sortEvents([optimistic, ...prev]));
 
     try {
-      const saved = await addDoc(collection(db, 'events'), {
-        dateKey, title, description, allDay, startTime, endTime,
-        ownerId: user.uid, createdAt: serverTimestamp(),
-      });
-      log.firebase('ViewDatePage: event saved with id', saved.id);
-      // Replace the temp ID with the real Firestore document ID.
-      setEvents(prev => prev.map(ev => ev.id === tempId ? { ...optimistic, id: saved.id } : ev));
+      const { data, error } = await supabase.from('events').insert({
+        date_key:    dateKey,
+        title,
+        description,
+        all_day:     allDay,
+        start_time:  startTime,
+        end_time:    endTime,
+        owner_id:    user.id,
+      }).select().single();
+
+      if (error) throw error;
+
+      log.firebase('ViewDatePage: event saved with id', data.id);
+      setEvents(prev => sortEvents(prev.map(ev => ev.id === tempId ? mapEvent(data) : ev)));
       setNewTitle(''); setNewDesc(''); setNewAllDay(false); setNewStartTime(''); setNewEndTime('');
     } catch (err) {
-      log.error('ViewDatePage: addDoc failed', err);
+      log.error('ViewDatePage: insert failed', err);
       setErr(err?.message || 'Failed to add event.');
-      // Roll back the optimistic update.
       setEvents(prev => prev.filter(ev => ev.id !== tempId));
     }
   }
@@ -262,7 +287,6 @@ export default function ViewDatePage() {
       if (startTime > endTime)    { setErr('Start time must be before end time.'); return; }
     }
 
-    // Snapshot the current events list so we can roll back on failure.
     const snapshot = events;
     log.firebase('ViewDatePage: saving edit for', id);
     setEvents(prev => prev.map(ev => ev.id === id
@@ -271,11 +295,19 @@ export default function ViewDatePage() {
     ));
 
     try {
-      await updateDoc(doc(db, 'events', id), { title, description, allDay, startTime, endTime });
+      const { error } = await supabase.from('events').update({
+        title,
+        description,
+        all_day:    allDay,
+        start_time: startTime,
+        end_time:   endTime,
+      }).eq('id', id);
+
+      if (error) throw error;
       log.firebase('ViewDatePage: edit saved for', id);
     } catch (err) {
-      log.error('ViewDatePage: updateDoc failed', err);
-      setEvents(snapshot); // roll back
+      log.error('ViewDatePage: update failed', err);
+      setEvents(snapshot);
       setErr(err?.message || 'Failed to save changes.');
     } finally {
       cancelEdit();
@@ -291,11 +323,12 @@ export default function ViewDatePage() {
     setEvents(prev => prev.filter(ev => ev.id !== id));
 
     try {
-      await deleteDoc(doc(db, 'events', id));
+      const { error } = await supabase.from('events').delete().eq('id', id);
+      if (error) throw error;
       log.firebase('ViewDatePage: event deleted', id);
     } catch (err) {
-      log.error('ViewDatePage: deleteDoc failed', err);
-      setEvents(snapshot); // roll back
+      log.error('ViewDatePage: delete failed', err);
+      setEvents(snapshot);
       setErr(err?.message || 'Failed to delete event.');
     }
   }

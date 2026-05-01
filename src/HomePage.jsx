@@ -1,7 +1,7 @@
 // src/HomePage.jsx
 //
 // Landing page: hero section, an "About Us" blurb, and a live list of the
-// next five upcoming events pulled from Firestore.
+// next five upcoming events pulled from Supabase.
 
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -9,8 +9,7 @@ import "./style.css";
 import "./HomePage.css";
 import logo from "./assets/BOXBoxer.png";
 
-import { db } from "./firebase";
-import { collection, query, where, orderBy, onSnapshot, limit } from "firebase/firestore";
+import { supabase, mapEvent } from "./supabase";
 import log from "./logger";
 
 // ---------------------------------------------------------------------------
@@ -20,7 +19,7 @@ import log from "./logger";
 /** Zero-pads a number to two digits: 5 → "05" */
 const pad2 = (n) => String(n).padStart(2, "0");
 
-/** Converts a Date object to a "YYYY-MM-DD" Firestore dateKey. */
+/** Converts a Date object to a "YYYY-MM-DD" dateKey. */
 const toKey = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 
 /** Converts a 24-hour "HH:MM" string to a 12-hour "h:mm AM/PM" string. */
@@ -52,71 +51,79 @@ export default function HomePage() {
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [nextFive, setNextFive] = useState([]);
 
-  // Subscribe to Firestore for the next chunk of future events and compute the
-  // nearest five on the client.  We over-fetch (limit 120) so that filtering
-  // out already-ended same-day events still leaves us with 5 results.
   useEffect(() => {
-    setLoadingEvents(true);
+    let mounted = true;
 
     const now      = new Date();
     const todayKey = toKey(now);
     const nowTime  = `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
 
-    log.firebase('HomePage: subscribing to upcoming events from', todayKey);
+    async function fetchEvents() {
+      log.firebase('HomePage: fetching upcoming events from', todayKey);
 
-    const qRef = query(
-      collection(db, "events"),
-      where("dateKey", ">=", todayKey),
-      orderBy("dateKey", "asc"),
-      limit(120)
-    );
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .gte('date_key', todayKey)
+        .order('date_key', { ascending: true })
+        .limit(120);
 
-    const unsub = onSnapshot(
-      qRef,
-      (snap) => {
-        log.firebase('HomePage: snapshot received —', snap.size, 'docs');
-        const rows = [];
-        snap.forEach((doc) => rows.push({ id: doc.id, ...doc.data() }));
+      if (!mounted) return;
 
-        // Drop events that have already ended today.
-        const upcoming = rows.filter((ev) => {
-          if (!ev?.dateKey) return false;
-          if (ev.dateKey > todayKey) return true;   // future date — always include
-          if (ev.dateKey < todayKey) return false;  // past date — should not appear given the query, but guard anyway
-          // Same day: include all-day events, and timed events that haven't ended yet.
-          if (ev.allDay) return true;
-          const et = ev.endTime   || "";
-          const st = ev.startTime || "";
-          if (et) return et >= nowTime;   // keep if still ongoing or upcoming
-          if (st) return st >= nowTime;   // keep if start time hasn't passed
-          return true;                    // no time info — assume upcoming
-        });
-
-        // Primary sort by date, secondary by all-day first, tertiary by start time.
-        upcoming.sort((a, b) => {
-          if (a.dateKey !== b.dateKey) return a.dateKey.localeCompare(b.dateKey);
-          const aIsAllDay = a.allDay ? 1 : 0;
-          const bIsAllDay = b.allDay ? 1 : 0;
-          if (aIsAllDay !== bIsAllDay) return bIsAllDay - aIsAllDay; // all-day first
-          const aStart = a.startTime || "99:99";
-          const bStart = b.startTime || "99:99";
-          return aStart.localeCompare(bStart);
-        });
-
-        log.firebase('HomePage: rendering', Math.min(upcoming.length, 5), 'of', upcoming.length, 'upcoming events');
-        setNextFive(upcoming.slice(0, 5));
-        setLoadingEvents(false);
-      },
-      (err) => {
-        log.error('HomePage: Firestore snapshot error', err);
+      if (error) {
+        log.error('HomePage: fetch error', error);
         setNextFive([]);
         setLoadingEvents(false);
+        return;
       }
-    );
+
+      log.firebase('HomePage: received', data.length, 'docs');
+      const rows = (data ?? []).map(mapEvent);
+
+      // Drop events that have already ended today.
+      const upcoming = rows.filter((ev) => {
+        if (!ev?.dateKey) return false;
+        if (ev.dateKey > todayKey) return true;
+        if (ev.dateKey < todayKey) return false;
+        if (ev.allDay) return true;
+        const et = ev.endTime   || "";
+        const st = ev.startTime || "";
+        if (et) return et >= nowTime;
+        if (st) return st >= nowTime;
+        return true;
+      });
+
+      // Primary sort by date, secondary by all-day first, tertiary by start time.
+      upcoming.sort((a, b) => {
+        if (a.dateKey !== b.dateKey) return a.dateKey.localeCompare(b.dateKey);
+        const aIsAllDay = a.allDay ? 1 : 0;
+        const bIsAllDay = b.allDay ? 1 : 0;
+        if (aIsAllDay !== bIsAllDay) return bIsAllDay - aIsAllDay;
+        const aStart = a.startTime || "99:99";
+        const bStart = b.startTime || "99:99";
+        return aStart.localeCompare(bStart);
+      });
+
+      log.firebase('HomePage: rendering', Math.min(upcoming.length, 5), 'of', upcoming.length, 'upcoming events');
+      setNextFive(upcoming.slice(0, 5));
+      setLoadingEvents(false);
+    }
+
+    fetchEvents();
+
+    // Re-fetch whenever any event row changes.
+    const channel = supabase
+      .channel('homepage-events')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => {
+        log.firebase('HomePage: change detected, re-fetching');
+        fetchEvents();
+      })
+      .subscribe();
 
     return () => {
+      mounted = false;
       log.firebase('HomePage: unsubscribing from events');
-      unsub();
+      supabase.removeChannel(channel);
     };
   }, []);
 
