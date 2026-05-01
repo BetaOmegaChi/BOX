@@ -20,11 +20,19 @@ jobs:
       - name: Use Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: 'npm'
 
       - name: Install deps
         run: npm ci || npm install
+
+      - name: Verify secrets
+        run: |
+          [ -n "$SUPABASE_URL" ] && echo "SUPABASE_URL: set" || echo "SUPABASE_URL: MISSING"
+          [ -n "$SUPABASE_ANON_KEY" ] && echo "SUPABASE_ANON_KEY: set" || echo "SUPABASE_ANON_KEY: MISSING"
+        env:
+          SUPABASE_URL:      ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
 
       - name: Build
         run: npm run build
