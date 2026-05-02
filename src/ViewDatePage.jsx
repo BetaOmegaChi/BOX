@@ -368,7 +368,7 @@ export default function ViewDatePage() {
             <label htmlFor="new-title">Title <span className="form-required">*</span></label>
             <input
               id="new-title"
-              placeholder="e.g. Chapter Meeting"
+              placeholder="e.g. Meeting"
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
             />

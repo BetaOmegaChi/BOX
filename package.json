@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Template for starting React projects with JavaScript",
   "scripts": {
-    "build": "webpack",
+    "build": "webpack --mode production",
     "start": "webpack-dev-server",
     "startAPI": "node index.js"
   },

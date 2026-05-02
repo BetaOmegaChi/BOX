@@ -13,7 +13,7 @@ module.exports = (env, argv) => {
       path: path.resolve(__dirname, 'dist'),
       filename: prod ? '[name].[contenthash].js' : '[name].js',
       assetModuleFilename: 'assets/[name].[contenthash][ext][query]',
-      publicPath: 'auto',          // ✅ works under /<repo> on GitHub Pages
+      publicPath: prod ? '/BOX/' : 'auto',
       clean: true                  // ✅ clears old files each build
     },
     module: {
