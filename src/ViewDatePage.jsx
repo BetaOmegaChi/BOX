@@ -363,35 +363,54 @@ export default function ViewDatePage() {
       {isLoggedIn ? (
         <form onSubmit={addEvent}>
           <p className="form-heading">Add Event</p>
-          <label className="inline">
-            All Day
+
+          <div className="form-field">
+            <label htmlFor="new-title">Title <span className="form-required">*</span></label>
             <input
-              type="checkbox"
-              checked={newAllDay}
-              onChange={e => setNewAllDay(e.target.checked)}
+              id="new-title"
+              placeholder="e.g. Chapter Meeting"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
             />
-          </label>
+          </div>
+
+          <div className="form-field">
+            <label htmlFor="new-desc">Description <span className="form-optional">(optional)</span></label>
+            <textarea
+              id="new-desc"
+              placeholder="Add any details members should know…"
+              value={newDesc}
+              onChange={(e) => setNewDesc(e.target.value)}
+              rows={3}
+            />
+          </div>
+
+          <div className="form-field">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={newAllDay}
+                onChange={e => setNewAllDay(e.target.checked)}
+              />
+              <span>All Day event</span>
+            </label>
+          </div>
 
           {!newAllDay && (
             <div className="time-row">
-              <input type="time" value={newStartTime} onChange={e => setNewStartTime(e.target.value)} aria-label="Start time" />
-              <input type="time" value={newEndTime}   onChange={e => setNewEndTime(e.target.value)}   aria-label="End time"   />
+              <div className="form-field">
+                <label htmlFor="new-start">Start Time</label>
+                <input id="new-start" type="time" value={newStartTime} onChange={e => setNewStartTime(e.target.value)} />
+              </div>
+              <div className="form-field">
+                <label htmlFor="new-end">End Time</label>
+                <input id="new-end" type="time" value={newEndTime} onChange={e => setNewEndTime(e.target.value)} />
+              </div>
             </div>
           )}
 
-          <input
-            placeholder="Title"
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
-          />
-          <textarea
-            placeholder="Description (optional)"
-            value={newDesc}
-            onChange={(e) => setNewDesc(e.target.value)}
-            rows={3}
-          />
-          <button type="submit">Add Event</button>
           {err && <div className="error" aria-live="polite">{err}</div>}
+          <button type="submit">Add Event</button>
         </form>
       ) : (
         <p className="calendar-note">Sign in to add events. <Link to="/login">Login</Link></p>

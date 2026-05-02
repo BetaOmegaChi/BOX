@@ -197,12 +197,7 @@
   user-select: none;
 }
 
-/* ── Time row (start / end inputs) ── */
-.time-row {
-  display: flex;
-  gap: 10px;
-}
-.time-row input { flex: 1; }
+/* ── Time row (start / end inputs) — layout handled per-page ── */
 
 /* ── Back row ── */
 .back-row { margin-top: 1.5rem; }
