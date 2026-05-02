@@ -465,6 +465,7 @@ export default function ViewDatePage() {
       <div className="back-row">
         <button
           type="button"
+          className="back-btn"
           onClick={() => {
             const [year, month] = dateKey.split('-');
             navigate('/calendar', {
@@ -472,7 +473,7 @@ export default function ViewDatePage() {
             });
           }}
         >
-          Back
+          ← Back to Calendar
         </button>
       </div>
 

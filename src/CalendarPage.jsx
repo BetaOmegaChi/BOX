@@ -312,7 +312,7 @@ export default function CalendarPage() {
       </div>
 
       <h2>Club Calendar</h2>
-      <p className="calendar-note">Click a date to view and (if logged in) add events for that day.</p>
+      {/* <p className="calendar-note">Click a date to view and (if logged in) add events for that day.</p> */}
 
       <div
         id="calendarGrid"
