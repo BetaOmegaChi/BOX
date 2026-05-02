@@ -8,7 +8,8 @@ import ViewDatePage from './ViewDatePage';
 import Footer from './Footer';
 import './style.css';
 
-
+// basename must match the GitHub Pages repo path (/BOX).
+// If the repo is renamed, update this value AND output.publicPath in webpack.config.js.
 function App() {
   return (
     <BrowserRouter basename="/BOX">

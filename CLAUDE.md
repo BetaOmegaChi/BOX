@@ -4,84 +4,74 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is the Beta Omega Chi fraternity website — a React SPA deployed to GitHub Pages, backed by Supabase (PostgreSQL database + auth).
+Beta Omega Chi fraternity website — a React SPA deployed to GitHub Pages, backed by Supabase (PostgreSQL + auth).  
+Live at: `https://betaomegachi.github.io/BOX/`
 
 ## Commands
 
 ```bash
-npm start        # Dev server at http://localhost:8080 (webpack-dev-server, SPA fallback enabled)
-npm run build    # Production build → /dist/
+npm start            # Dev server at http://localhost:8080
+npm run build        # Production build → /dist/ (mode=production, publicPath=/BOX/)
 ```
 
 No test framework is configured.
 
 ## Deployment
 
-Pushing to `main` triggers a GitHub Actions workflow (`.github/workflows/publish-docs.yml`) that:
-1. Builds with webpack → `/dist/`
-2. Copies `/dist/` to `/docs/` (adds 404.html for SPA deep linking, `.nojekyll`)
-3. Commits and pushes the `/docs/` directory
+Pushing to `main` triggers `.github/workflows/publish-docs.yml`, which:
+1. Builds with Webpack → `/dist/`
+2. Copies `/dist/` → `/docs/` (adds `404.html` for SPA deep linking, `.nojekyll`)
+3. Commits and pushes `/docs/` back to `main`
 4. GitHub Pages serves from `/docs/`
 
-The router uses `basename="/BetaOmegaChi"` in `App.jsx` to match the GitHub Pages URL path.
+**Important:** `output.publicPath` is set to `/BOX/` in production builds (not `auto`). This ensures asset paths are absolute so the `404.html` deep-link fallback works correctly from any URL depth.
 
 ## Architecture
 
 **Entry points:**
-- `static/index.html` — HTML template (Webpack injects bundle here, `id="root"`)
+- `static/index.html` — HTML template (Webpack injects bundle here)
 - `src/main.jsx` — ReactDOM root render
-- `src/App.jsx` — Router with all routes
+- `src/App.jsx` — Router with `basename="/BOX"` and all routes
 
 **Routes:**
-- `/` → `HomePage` — next 5 upcoming events (real-time)
-- `/calendar` → `CalendarPage` — monthly grid view (real-time)
-- `/view-date/:dateKey` → `ViewDatePage` — event CRUD (write access requires auth)
+- `/` → `HomePage` — hero + next 5 upcoming events (real-time)
+- `/calendar` → `CalendarPage` — monthly grid (real-time)
+- `/view-date/:dateKey` → `ViewDatePage` — event CRUD (writes require auth)
 - `/login` → `LoginPage` — Supabase email/password auth
 
 **Supabase:**
-- `src/supabase.js` — exports `supabase` client and `mapEvent` (DB row → camelCase)
-- `src/auth.js` — auth helper functions (signIn, logOut, watchUser, signUp)
-- DB table: `events` — columns: `id`, `date_key`, `title`, `description`, `start_time`, `end_time`, `all_day`, `owner_id`, `created_at`
-- Real-time via `supabase.channel().on('postgres_changes', ...)` on HomePage, CalendarPage, ViewDatePage
-- Authenticated users (Supabase Auth) can create, edit, and delete events on ViewDatePage
-- Row Level Security (RLS) enforces public read / auth-only write on the `events` table
+- `src/supabase.js` — exports `supabase` client and `mapEvent(row)` (snake_case DB → camelCase app)
+- `src/auth.js` — thin wrappers: `signIn`, `logOut`, `watchUser`, `signUp`
+- DB table: `events` with columns `id`, `date_key`, `title`, `description`, `all_day`, `start_time`, `end_time`, `owner_id`, `created_at`
+- Real-time via `supabase.channel().on('postgres_changes', ...)` — all three data pages subscribe
+- Row Level Security: public SELECT, auth-only INSERT/UPDATE/DELETE (owner only for writes)
 
 **Env vars (build-time, injected by Webpack DefinePlugin):**
-- `SUPABASE_URL` — your Supabase project URL
-- `SUPABASE_ANON_KEY` — your Supabase anon/public key (safe to expose in browser)
+- `SUPABASE_URL` — Supabase project URL (e.g. `https://xyz.supabase.co`)
+- `SUPABASE_ANON_KEY` — Supabase anon/public key (safe to expose in browser)
 
-**Styling:** Each component has a paired `.css` file. Global styles in `src/main.css` and `src/style.css`.
+**Styling:**
+- `src/main.css` — design tokens (CSS custom properties), reset, base styles
+- `src/style.css` — shared component styles (buttons, calendar controls, event rows)
+- Each page component has a paired `.css` file
+
+## Key Implementation Details
+
+**`mapEvent(row)`** in `supabase.js` converts DB snake_case columns to the camelCase field names used throughout the app (`date_key` → `dateKey`, `all_day` → `allDay`, etc.). Always use this when reading from Supabase.
+
+**Optimistic updates** in `ViewDatePage` — events are added to local state immediately with a temp ID, then replaced with the real DB ID once the insert confirms. On failure the local state is rolled back.
+
+**Real-time pattern** — each page does an initial `fetch` then subscribes to `postgres_changes`. On any change event, it re-fetches the full dataset rather than diffing the payload. Simple and reliable.
+
+**`basename="/BOX"`** in `App.jsx` must match the GitHub Pages repo path. If the repo is ever renamed, update this value and `output.publicPath` in `webpack.config.js`.
 
 ## Supabase Setup (for new maintainers)
 
 1. Create a free project at https://supabase.com
-2. In the SQL Editor, run:
-
-```sql
-create table events (
-  id          uuid        default gen_random_uuid() primary key,
-  date_key    text        not null,
-  title       text        not null,
-  description text        default '',
-  all_day     boolean     default false,
-  start_time  text        default '',
-  end_time    text        default '',
-  owner_id    uuid        references auth.users(id) on delete set null,
-  created_at  timestamptz default now()
-);
-
-alter table events enable row level security;
-
-create policy "Public read"   on events for select using (true);
-create policy "Auth insert"   on events for insert with check (auth.uid() = owner_id);
-create policy "Owner update"  on events for update using (auth.uid() = owner_id);
-create policy "Owner delete"  on events for delete using (auth.uid() = owner_id);
-
-create index events_date_key_idx on events (date_key);
-```
-
+2. Run the SQL schema from README.md in the SQL Editor
 3. Enable Realtime for the `events` table: Database → Replication → toggle `events`
-4. Copy your Project URL and anon key from Project Settings → API
-5. Add members via Authentication → Users → Invite user
-6. Set `SUPABASE_URL` and `SUPABASE_ANON_KEY` as GitHub Actions secrets (Settings → Secrets → Actions)
-7. Copy `.env.example` → `.env` and fill in those same values for local development
+4. Add members via Authentication → Users → Invite user
+5. Copy Project URL and anon key from Project Settings → API
+6. Add `SUPABASE_URL` and `SUPABASE_ANON_KEY` as GitHub Actions secrets
+7. Copy `.env.example` → `.env` and fill in the same values for local dev
+8. In Authentication → URL Configuration, set Site URL to `https://betaomegachi.github.io/BOX/`

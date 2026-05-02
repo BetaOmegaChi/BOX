@@ -22,9 +22,9 @@ const logger = isDev
       warn:     (...args) => console.warn  ('%c[BOX:warn]',   'color:#d6a61a;font-weight:bold', ...args),
       /** Errors — always log these */
       error:    (...args) => console.error ('%c[BOX:error]',  'color:#d64f4f;font-weight:bold', ...args),
-      /** Firestore subscribe / snapshot events */
+      /** Database fetch and real-time subscription events */
       firebase: (...args) => console.log   ('%c[BOX:firebase]','color:#ff9900;font-weight:bold', ...args),
-      /** Firebase Auth state transitions */
+      /** Auth state transitions (sign-in, sign-out) */
       auth:     (...args) => console.log   ('%c[BOX:auth]',   'color:#34a853;font-weight:bold', ...args),
     }
   : {
