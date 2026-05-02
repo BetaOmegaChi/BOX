@@ -191,7 +191,6 @@ export default function CalendarPage() {
     isDragging.current   = true;
     pointerTime.current  = performance.now();
     pointerStart.current = { x: e.clientX, y: e.clientY };
-    e.currentTarget.setPointerCapture?.(e.pointerId);
   };
 
   const onPointerMove = (/* e */) => {};
