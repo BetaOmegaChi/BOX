@@ -2,13 +2,13 @@ name: Build & Publish to docs (GitHub Pages)
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
     # Prevent infinite loops: don't rerun when only /docs changes are pushed by this job
     paths-ignore:
-      - 'docs/**'
+      - "docs/**"
 
 permissions:
-  contents: write  # needed to push the updated /docs back to main
+  contents: write # needed to push the updated /docs back to main
 
 jobs:
   build:
@@ -21,7 +21,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: 'npm'
+          cache: "npm"
 
       - name: Install deps
         run: npm ci || npm install
@@ -31,14 +31,14 @@ jobs:
           [ -n "$SUPABASE_URL" ] && echo "SUPABASE_URL: set" || echo "SUPABASE_URL: MISSING"
           [ -n "$SUPABASE_ANON_KEY" ] && echo "SUPABASE_ANON_KEY: set" || echo "SUPABASE_ANON_KEY: MISSING"
         env:
-          SUPABASE_URL:      ${{ secrets.SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
 
       - name: Build
         run: npm run build
         env:
           CI: true
-          SUPABASE_URL:      ${{ secrets.SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
 
       - name: Publish to docs/
