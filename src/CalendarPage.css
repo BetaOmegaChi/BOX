@@ -1,9 +1,7 @@
 /* src/CalendarPage.css — tokens from main.css */
 
 .calendar-page {
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 32px 20px 80px;
+  padding: 32px 24px 80px;
   color: var(--text);
 }
 
@@ -31,7 +29,7 @@
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  min-height: clamp(80px, 12vw, 120px);
+  min-height: clamp(90px, 14vw, 140px);
   padding: 8px;
   box-shadow: var(--shadow-sm);
   overflow: hidden;
@@ -103,7 +101,6 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
-  /* override style.css list styles */
   list-style: none;
   padding: 0;
   margin: 0;
@@ -140,12 +137,12 @@
 
 /* ── Small screens ── */
 @media (max-width: 560px) {
-  .calendar-page { padding: 20px 12px 60px; }
-  .calendar-grid { gap: 4px; }
-  .calendar-cell { min-height: clamp(60px, 12vw, 90px); padding: 5px; }
-  .calendar-cell.header { font-size: 0.68rem; }
-  .day-number { font-size: 0.82rem; }
-  .calendar-cell .event-title { font-size: 0.65rem; }
+  .calendar-page { padding: 20px 10px 60px; }
+  .calendar-grid { gap: 3px; }
+  .calendar-cell { min-height: clamp(56px, 12vw, 90px); padding: 5px; }
+  .calendar-cell.header { font-size: 0.65rem; }
+  .day-number { font-size: 0.78rem; padding: 2px 5px; }
+  .calendar-cell .event-title { font-size: 0.62rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

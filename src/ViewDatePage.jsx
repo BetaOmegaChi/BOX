@@ -362,6 +362,7 @@ export default function ViewDatePage() {
       {/* Add event form — only visible to authenticated members */}
       {isLoggedIn ? (
         <form onSubmit={addEvent}>
+          <p className="form-heading">Add Event</p>
           <label className="inline">
             All Day
             <input
@@ -397,13 +398,15 @@ export default function ViewDatePage() {
       )}
 
       {/* Event list */}
+      {events.length > 0 && <p className="events-section-heading">Events</p>}
+      {events.length === 0 && <p className="no-events">No events for this day.</p>}
       <ul>
         {events.map((ev) => (
           <li key={ev.id}>
             {editingId === ev.id ? (
               /* ---- Inline edit form ---- */
-              <>
-                <label className="inline">
+              <div className="event-body">
+              <label className="inline">
                   All Day
                   <input
                     type="checkbox"
@@ -432,27 +435,27 @@ export default function ViewDatePage() {
                   <button onClick={() => saveEdit(ev.id)}>Save</button>
                   <button onClick={cancelEdit}>Cancel</button>
                 </div>
-              </>
+              </div>
             ) : (
               /* ---- Read view ---- */
-              <>
-                <div>
+              <div className="event-body">
+                <div className="event-header">
                   <strong>{ev.title ?? ev.text}</strong>
-                  <div className="event-time">
+                  <span className="event-time-badge">
                     {ev.allDay
                       ? 'All Day'
                       : `${formatTime12h(ev.startTime ?? '')}${ev.endTime ? ' – ' + formatTime12h(ev.endTime) : ''}`
                     }
-                  </div>
+                  </span>
                 </div>
-                <div className="desc">{ev.description}</div>
+                {ev.description ? <div className="desc">{ev.description}</div> : null}
                 {isLoggedIn && (
                   <div className="actions">
                     <button onClick={() => beginEdit(ev)}>Edit</button>
                     <button className="danger" onClick={() => removeEvent(ev.id)}>Delete</button>
                   </div>
                 )}
-              </>
+              </div>
             )}
           </li>
         ))}

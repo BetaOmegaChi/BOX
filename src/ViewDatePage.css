@@ -1,17 +1,10 @@
 /* src/ViewDatePage.css — tokens from main.css */
 
 .view-date-page {
-  max-width: 680px;
+  max-width: 720px;
   margin: 32px auto;
   padding: 0 20px 80px;
   color: var(--text);
-}
-
-/* ── Page heading ── */
-.view-date-page h2 {
-  font-size: clamp(1.3rem, 3vw, 1.7rem);
-  font-weight: 800;
-  margin-bottom: 1.25rem;
 }
 
 /* ── Add-event form ── */
@@ -21,9 +14,19 @@
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 18px;
+  padding: 20px;
   box-shadow: var(--shadow-sm);
-  margin-bottom: 24px;
+  margin-bottom: 28px;
+  border-top: 3px solid var(--green);
+}
+
+.view-date-page .form-heading {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--green);
+  letter-spacing: 0.3px;
+  margin-bottom: 2px;
 }
 
 /* ── Inputs ── */
@@ -48,7 +51,7 @@
   background: color-mix(in oklab, var(--bg) 94%, var(--green));
 }
 
-/* ── Form buttons ── */
+/* ── Form submit button ── */
 .view-date-page form button[type="submit"] {
   background: var(--green);
   color: #fff;
@@ -71,6 +74,17 @@
   outline-offset: 2px;
 }
 
+/* ── Events section heading ── */
+.events-section-heading {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
 /* ── Event list ── */
 .view-date-page ul {
   list-style: none;
@@ -78,38 +92,86 @@
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
+/* ── Event card ── */
 .view-date-page li {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 14px 16px;
+  padding: 0;
   box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: box-shadow 0.15s ease, transform 0.08s ease;
+}
+.view-date-page li:hover {
+  box-shadow: var(--shadow);
+  transform: translateY(-1px);
+}
+
+/* Coloured top accent bar */
+.view-date-page li::before {
+  content: '';
+  display: block;
+  height: 4px;
+  background: linear-gradient(90deg, var(--green), var(--green-mid));
+  flex-shrink: 0;
+}
+
+.view-date-page li .event-body {
+  padding: 14px 16px;
   display: grid;
   gap: 6px;
 }
 
-.view-date-page li strong {
-  font-family: var(--font-display);
-  font-size: 1.05rem;
-  font-weight: 700;
-  display: block;
+/* ── Event header (title + time badge) ── */
+.view-date-page li .event-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
 }
 
-.view-date-page li .event-time {
-  font-size: 0.85rem;
-  font-style: italic;
-  color: var(--muted);
+.view-date-page li strong {
+  font-family: var(--font-display);
+  font-size: 1.08rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.25;
+}
+
+.view-date-page li .event-time-badge {
+  flex-shrink: 0;
+  background: color-mix(in oklab, var(--orange) 12%, var(--elev));
+  color: var(--orange-dark);
+  border: 1px solid color-mix(in oklab, var(--orange) 25%, var(--border));
+  border-radius: 99px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-style: normal;
+  font-family: var(--font-body);
+  padding: 2px 10px;
+  white-space: nowrap;
   margin-top: 2px;
 }
 
+@media (prefers-color-scheme: dark) {
+  .view-date-page li .event-time-badge {
+    background: color-mix(in oklab, var(--orange) 15%, var(--card));
+    color: #f8a07a;
+    border-color: color-mix(in oklab, var(--orange) 30%, var(--border));
+  }
+}
+
+/* ── Description ── */
 .view-date-page .desc {
   font-size: 0.93rem;
   color: var(--text-2);
   white-space: pre-wrap;
-  margin-top: 4px;
+  line-height: 1.6;
 }
 
 /* ── Action buttons (Edit / Delete / Save / Cancel) ── */
@@ -124,7 +186,7 @@
   background: var(--elev);
   color: var(--text);
   border: 1px solid var(--border);
-  padding: 6px 13px;
+  padding: 6px 14px;
   border-radius: var(--radius-sm);
   font-family: var(--font-body);
   font-size: 0.85rem;
@@ -151,7 +213,22 @@
 }
 
 /* ── Sign-in note ── */
+.view-date-page .calendar-note {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  margin-bottom: 24px;
+}
 .view-date-page .calendar-note a { color: var(--orange); }
+
+/* ── Empty state ── */
+.view-date-page .no-events {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--muted);
+  font-style: italic;
+}
 
 /* ── Error card (invalid URL) ── */
 .view-date-page .error-card {
@@ -184,9 +261,11 @@
 @media (max-width: 520px) {
   .view-date-page { padding: 0 14px 60px; margin-top: 20px; }
   .view-date-page form { padding: 14px; }
+  .view-date-page li .event-header { flex-direction: column; gap: 6px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .view-date-page li,
   .view-date-page form button,
   .view-date-page .actions button { transition: none; }
 }
