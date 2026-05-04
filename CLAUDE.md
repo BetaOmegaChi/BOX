@@ -65,6 +65,8 @@ Pushing to `main` triggers `.github/workflows/publish-docs.yml`, which:
 
 **`basename="/BOX"`** in `App.jsx` must match the GitHub Pages repo path. If the repo is ever renamed, update this value and `output.publicPath` in `webpack.config.js`.
 
+**Local dev** — run `npm start` to serve the site at http://localhost:8080. The dev server uses `publicPath: 'auto'` so no code changes are needed when switching branches.
+
 ## Supabase Setup (for new maintainers)
 
 1. Create a free project at https://supabase.com
@@ -78,10 +80,8 @@ Pushing to `main` triggers `.github/workflows/publish-docs.yml`, which:
 
 ## Future plans for the website 
 
-1. Create a dev branch to push tests so we have a buffer between potential bad updates and the public
-2. Create a good way to view the dev branch like on localhost without having to change code back and forth as mentioned at ln 66
-3. Host on vercel instead of github
-4. Just for me is add officers as users on supabase so they can add to the calendar
+1. Host on Vercel instead of GitHub Pages
+2. Add officers as users on Supabase so they can add to the calendar
 
 ## Potential ideas to think about
 
