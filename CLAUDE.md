@@ -75,3 +75,19 @@ Pushing to `main` triggers `.github/workflows/publish-docs.yml`, which:
 6. Add `SUPABASE_URL` and `SUPABASE_ANON_KEY` as GitHub Actions secrets
 7. Copy `.env.example` → `.env` and fill in the same values for local dev
 8. In Authentication → URL Configuration, set Site URL to `https://betaomegachi.github.io/BOX/`
+
+## Future plans for the website 
+
+1. Create a dev branch to push tests so we have a buffer between potential bad updates and the public
+2. Create a good way to view the dev branch like on localhost without having to change code back and forth as mentioned at ln 66
+3. Host on vercel instead of github
+4. Just for me is add officers as users on supabase so they can add to the calendar
+
+## Potential ideas to think about
+
+1. Add some pictures of the members so its not just green
+2. Add a suggestion box/ link to google forms
+3. Maybe put a link to the calculator that is only accessible to harding emails. Possibly only box emails as well
+4. Eventually let all members have accounts with limited permissions
+5. Come up with more ideas
+6. Officer only view for calendar for meetings and such
