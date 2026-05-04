@@ -144,7 +144,7 @@ export default function HomePage() {
           Beta Omega Chi is a brotherhood Built On Christ at Harding University.
           We strive to shine God's light through service, friendship, and example,
           building strong bonds among our members while encouraging one another
-          toward spiritual growth and unity. Testing dev vs main
+          toward spiritual growth and unity.
         </p>
       </section>
 
