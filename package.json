@@ -4,7 +4,7 @@
   "description": "Template for starting React projects with JavaScript",
   "scripts": {
     "build": "webpack --mode production",
-    "start": "webpack-dev-server --mode development",
+    "start": "npx kill-port 8080 && webpack-dev-server --mode development",
     "startAPI": "node index.js"
   },
   "keywords": [],
