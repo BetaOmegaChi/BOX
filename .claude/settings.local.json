@@ -5,7 +5,9 @@
       "Bash(npx webpack:*)",
       "Bash(./node_modules/.bin/webpack)",
       "Bash(npm install:*)",
-      "Bash(npm start *)"
+      "Bash(npm start *)",
+      "PowerShell(Get-NetTCPConnection *)",
+      "PowerShell(Stop-Process *)"
     ]
   },
   "enabledPlugins": {
