@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 Beta Omega Chi fraternity website — a React SPA deployed to GitHub Pages, backed by Supabase (PostgreSQL + auth).  
-Live at: `https://betaomegachi.github.io/BOX/`
+Live at: `https://beta-omega-chi.github.io/BOX/`
 
 ## Commands
 
