@@ -86,7 +86,7 @@ Pushing to `main` triggers `.github/workflows/publish-docs.yml`, which:
 ## Potential ideas to think about
 
 1. Add some pictures of the members so its not just green
-2. Add a suggestion box/ link to google forms
+2. Add a suggestion box/ link to google forms. Regular members can add things to the calendar like soccer at 5pm so they can plan their own events around our official schedule
 3. Maybe put a link to the calculator that is only accessible to harding emails. Possibly only box emails as well
 4. Eventually let all members have accounts with limited permissions
 5. Come up with more ideas
