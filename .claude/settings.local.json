@@ -4,7 +4,8 @@
       "Bash(npm run:*)",
       "Bash(npx webpack:*)",
       "Bash(./node_modules/.bin/webpack)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(npm start *)"
     ]
   },
   "enabledPlugins": {

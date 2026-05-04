@@ -12,7 +12,7 @@ import './style.css';
 // If the repo is renamed, update this value AND output.publicPath in webpack.config.js.
 function App() {
   return (
-    <BrowserRouter basename="/BOX">
+    <BrowserRouter basename={process.env.NODE_ENV === 'production' ? '/BOX' : ''}>
       <NavBar />
       <Routes>
         <Route path="/" element={<HomePage />} />

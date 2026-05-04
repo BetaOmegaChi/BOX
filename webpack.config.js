@@ -43,6 +43,7 @@ module.exports = (env, argv) => {
         inject: 'body',    // ✅ auto-injects the hashed <script> tag
       }),
       new webpack.DefinePlugin({
+        'process.env.NODE_ENV':          JSON.stringify(prod ? 'production' : 'development'),
         'process.env.SUPABASE_URL':      JSON.stringify(process.env.SUPABASE_URL),
         'process.env.SUPABASE_ANON_KEY': JSON.stringify(process.env.SUPABASE_ANON_KEY),
       }),
