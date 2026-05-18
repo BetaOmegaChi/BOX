@@ -9,10 +9,10 @@ import Footer from './Footer';
 import './style.css';
 
 // basename must match the GitHub Pages repo path (/BOX).
-// If the repo is renamed, update this value AND output.publicPath in webpack.config.js.
+// If the repo is renamed, update this value AND output.publicPath in webpack.config.js. //hosting on vercel has elimanated this issue
 function App() {
   return (
-    <BrowserRouter basename={process.env.NODE_ENV === 'production' ? '/BOX' : ''}>
+    <BrowserRouter>
       <NavBar />
       <Routes>
         <Route path="/" element={<HomePage />} />
