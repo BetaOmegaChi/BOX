@@ -91,3 +91,4 @@ Pushing to `main` triggers `.github/workflows/publish-docs.yml`, which:
 4. Eventually let all members have accounts with limited permissions
 5. Come up with more ideas
 6. Officer only view for calendar for meetings and such
+7. 
