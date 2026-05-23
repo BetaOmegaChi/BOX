@@ -4,27 +4,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Beta Omega Chi fraternity website — a React SPA deployed to GitHub Pages, backed by Supabase (PostgreSQL + auth).  
-Live at: `https://beta-omega-chi.github.io/BOX/`
+Beta Omega Chi fraternity website — a React SPA deployed to Vercel, backed by Supabase (PostgreSQL + auth).  
+Live at: `https://box-website-pi.vercel.app/`
 
 ## Commands
 
 ```bash
 npm start            # Dev server at http://localhost:8080
-npm run build        # Production build → /dist/ (mode=production, publicPath=/BOX/)
+npm run build        # Production build → /dist/ (publicPath=/)
 ```
 
 No test framework is configured.
 
 ## Deployment
 
-Pushing to `main` triggers `.github/workflows/publish-docs.yml`, which:
-1. Builds with Webpack → `/dist/`
-2. Copies `/dist/` → `/docs/` (adds `404.html` for SPA deep linking, `.nojekyll`)
-3. Commits and pushes `/docs/` back to `main`
-4. GitHub Pages serves from `/docs/`
+Pushing to `main` triggers an automatic Vercel deployment. Vercel runs `npm run build`, serves from `/dist/`, and handles SPA deep-link routing via the rewrite rule in `vercel.json`.
 
-**Important:** `output.publicPath` is set to `/BOX/` in production builds (not `auto`). This ensures asset paths are absolute so the `404.html` deep-link fallback works correctly from any URL depth.
+No CI workflow needed — Vercel deploys directly from the GitHub repo.
 
 ## Architecture
 
@@ -63,7 +59,7 @@ Pushing to `main` triggers `.github/workflows/publish-docs.yml`, which:
 
 **Real-time pattern** — each page does an initial `fetch` then subscribes to `postgres_changes`. On any change event, it re-fetches the full dataset rather than diffing the payload. Simple and reliable.
 
-**`basename="/BOX"`** in `App.jsx` must match the GitHub Pages repo path. If the repo is ever renamed, update this value and `output.publicPath` in `webpack.config.js`.
+**No `basename`** needed — Vercel serves from the root, so `BrowserRouter` uses `/` with no path prefix.
 
 **Local dev** — run `npm start` to serve the site at http://localhost:8080. The dev server uses `publicPath: 'auto'` so no code changes are needed when switching branches.
 
@@ -74,13 +70,13 @@ Pushing to `main` triggers `.github/workflows/publish-docs.yml`, which:
 3. Enable Realtime for the `events` table: Database → Replication → toggle `events`
 4. Add members via Authentication → Users → Invite user
 5. Copy Project URL and anon key from Project Settings → API
-6. Add `SUPABASE_URL` and `SUPABASE_ANON_KEY` as GitHub Actions secrets
+6. Add `SUPABASE_URL` and `SUPABASE_ANON_KEY` as Environment Variables in the Vercel project dashboard
 7. Copy `.env.example` → `.env` and fill in the same values for local dev
-8. In Authentication → URL Configuration, set Site URL to `https://betaomegachi.github.io/BOX/`
+8. In Authentication → URL Configuration, set Site URL to `https://box-website-pi.vercel.app`
 
 ## Future plans for the website 
 
-1. Host on Vercel instead of GitHub Pages
+1. ~~Host on Vercel instead of GitHub Pages~~ ✓ Done
 2. Add officers as users on Supabase so they can add to the calendar
 
 ## Potential ideas to think about
